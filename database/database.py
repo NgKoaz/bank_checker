@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 class Database:    
-    __engine = create_async_engine("mysql+aiomysql://" + Config.DATABASE_URL, echo=True)
+    __engine = create_async_engine("mysql+aiomysql://" + Config.DATABASE_URL, echo=False)
     SessionLocal = sessionmaker(bind=__engine, class_=AsyncSession, expire_on_commit=False)
 
     @staticmethod
@@ -29,6 +29,17 @@ class Database:
             session: AsyncSession
             result = await session.execute(text("SELECT MAX(date) FROM transactions"))
             return result.scalar() or datetime.min
+
+    @staticmethod
+    async def delete_old_transactions(session: AsyncSession, date: datetime):
+        query = text("""
+            DELETE FROM transactions 
+            WHERE date < DATE_SUB(:date, INTERVAL 2 DAY)
+            AND date NOT IN (
+                SELECT MAX(date) FROM transactions
+            )
+        """)
+        return await session.execute(query, {"date": date.strftime("%Y-%m-%d %H:%M:%S")})
 
     @staticmethod
     async def exec_transaction(operations: List[Callable[[AsyncSession], Any]]) -> List[Any]:

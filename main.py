@@ -7,15 +7,23 @@ from database.models import Bank, Transaction
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from config import Config
+import logging
 import aiohttp
 
 
+logging.basicConfig(
+    level=logging.DEBUG,  # Ghi log từ DEBUG trở lên
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("bank_checking")
 
 async def fetch_banks_info():
     if await Database.has_banks():
         return
     async with aiohttp.ClientSession() as session:
         async with session.get(Config.BANK_INFO_URL) as response:
+            logger.info("Fetching bank info")
             result = await response.json()
             banks = result['data']
             async def save_banks(session: AsyncSession):
@@ -32,6 +40,7 @@ async def fetch_transactions():
         end_query_day = datetime.now()
         start_query_day = end_query_day - timedelta(days=1)
         try:
+            logger.info("Fetching transactions")
             results = await mb.getTransactionAccountHistory(from_date=start_query_day, to_date=end_query_day)
             transactions = results['transactionHistoryList']
             lastest_payment_date = await Database.get_latest_transaction_date()
@@ -60,17 +69,24 @@ async def fetch_transactions():
             await asyncio.sleep(Config.FETCH_TRANSACTIONS_INTERVAL)
         except MBBankError:
             mb = MBBankAsync(username=Config.BANK_USERNAME, password=Config.BANK_PASSWORD, ocr_class=solver)
-            print(f"username={Config.BANK_USERNAME}, password={Config.BANK_PASSWORD}")
-            print("Reconnecting to the bank server")
+            logger.info("Reconnecting to the bank server")
             await asyncio.sleep(3)
 
 
-async def main():
-    await Database.init_db()
-    await fetch_banks_info()
-    await fetch_transactions()
+async def schedule_cleanup():
+    while True:
+        await Database.exec_transaction([lambda session: Database.delete_old_transactions(session, datetime.now())])
+        logger.info("Cleaned up old transactions")
+        await asyncio.sleep(24 * 3600)
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(Database.init_db())
+    loop.run_until_complete(Database.has_banks())
+    loop.create_task(schedule_cleanup())
+    loop.create_task(fetch_transactions())
+    loop.run_forever()
+
 
 
