@@ -23,7 +23,7 @@ async def fetch_banks_info():
         return
     async with aiohttp.ClientSession() as session:
         async with session.get(Config.BANK_INFO_URL) as response:
-            logger.info("Fetching bank info")
+            
             result = await response.json()
             banks = result['data']
             async def save_banks(session: AsyncSession):
@@ -83,7 +83,7 @@ async def schedule_cleanup():
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.run_until_complete(Database.init_db())
-    loop.run_until_complete(Database.has_banks())
+    loop.run_until_complete(fetch_banks_info())
     loop.create_task(schedule_cleanup())
     loop.create_task(fetch_transactions())
     loop.run_forever()

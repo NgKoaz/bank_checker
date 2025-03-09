@@ -6,6 +6,9 @@ from datetime import datetime
 
 class Transaction(Base):
     __tablename__ = "transactions"
+    __table_args__ = {"mysql_charset": "utf8mb4", "mysql_engine": "InnoDB"}
+
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     bank_bin: Mapped[int] = mapped_column(Integer, ForeignKey("banks.bin"), nullable=False)
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
