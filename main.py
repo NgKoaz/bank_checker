@@ -41,7 +41,11 @@ async def fetch_transactions():
         start_query_day = end_query_day - timedelta(days=1)
         try:
             logger.info("Fetching transactions")
-            results = await mb.getTransactionAccountHistory(from_date=start_query_day, to_date=end_query_day)
+            try:
+                results = await mb.getTransactionAccountHistory(from_date=start_query_day, to_date=end_query_day)
+            except Exception as e:
+                print(str(e))
+                await asyncio.sleep(Config.FETCH_TRANSACTIONS_INTERVAL)
             transactions = results['transactionHistoryList']
             lastest_payment_date = await Database.get_latest_transaction_date()
             async def save_transactions(session: AsyncSession):

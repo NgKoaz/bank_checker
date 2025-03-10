@@ -81,7 +81,12 @@ class MBBankAsync:
             headers["DeviceId"] = self.deviceIdCommon
             async with aiohttp.ClientSession() as s:
                 async with s.post(url, headers=headers, json=json_data, proxy=self.proxy) as r:
-                    data_out = await r.json()
+                    try:
+                        data_out = await r.json()
+                    except aiohttp.ContentTypeError:
+                        text = await r.text()
+                        raise Exception(f"Error parsing JSON: Server returned {r.content_type}\nResponse content: {text}")
+                    
             if data_out["result"] is None:
                 await self.getBalance()
             elif data_out["result"]["ok"]:
